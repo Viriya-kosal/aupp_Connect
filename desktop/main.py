@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QDialog, QSizePolicy, QToolButton, QMenu,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from PyQt6.QtGui import QPixmap, QAction, QCursor
+from PyQt6.QtGui import QPixmap, QAction, QCursor, QColor
 
 API_BASE = 'http://127.0.0.1:8000/api'
 
@@ -75,8 +75,9 @@ QLineEdit, QTextEdit {
     border: 1.5px solid #E4E6EF; border-radius: 10px;
     padding: 10px 14px; background: #FFFFFF;
     font-size: 13px; color: #1A1A2E;
+    selection-background-color: #1A6ED8;
 }
-QLineEdit:focus, QTextEdit:focus { border: 1.5px solid #1A6ED8; background: #FAFCFF; }
+QLineEdit:focus, QTextEdit:focus { border: 1.5px solid #1A6ED8; background: #FFFFFF; }
 QComboBox {
     border: 1.5px solid #E4E6EF; border-radius: 10px;
     padding: 8px 14px; background: #FFFFFF;
@@ -95,11 +96,38 @@ QToolTip { background: #1A1A2E; color: white; border: none; border-radius: 6px; 
 
 _meta = {'departments': {}, 'course_tags': {}}
 
+DEFAULT_DEPARTMENTS = {
+    'AI': 'Artificial Intelligence',
+    'CS':  'Computer Science',
+    'CB': 'Cybersecurity',
+    'DA': 'Data Analytics',
+    'DI': 'Digital Infrastructure',
+    'ICT': 'Information and Communication Technology',
+    'IAD': 'Interactive App Design and Development',
+    'SW': 'Software Development',
+    'BA':  'Business Administration',
+    'COM': 'Communications',
+    'e-s': 'e-Society (Digital Marketing )',
+    'LAW': 'Law',
+    'IR':  'International Relations and Diplomacy/Political Science',
+}
+
+DEFAULT_COURSE_TAGS = {
+    'COSC121': 'COSC 121',
+    'MATH101': 'MATH 101',
+    'BUS201':  'BUS 201',
+    'ENG101':  'ENG 101',
+    'ENGL202': 'ENGL 202',
+}
+
 def load_metadata():
     result = api('GET', '/metadata/')
     if result and 'departments' in result:
         _meta['departments'] = result['departments']
         _meta['course_tags'] = result['course_tags']
+    else:
+        _meta['departments'] = DEFAULT_DEPARTMENTS
+        _meta['course_tags'] = DEFAULT_COURSE_TAGS
 
 
 def timesince(dt_str):
@@ -147,6 +175,23 @@ def show_toast(parent_window, message, color=SUCCESS):
     toast.show()
     toast.raise_()
     QTimer.singleShot(2500, toast.deleteLater)
+
+
+# ── Shared input field style helper ───────────────────────────────────────────
+def auth_field_style():
+    return (
+        f"QLineEdit{{border:1.5px solid {BORDER};border-radius:12px;"
+        f"padding:0 16px;font-size:13px;background:#FFFFFF;color:{TEXT_DARK};}}"
+        f"QLineEdit:focus{{border:2px solid {PRIMARY};background:#F5F9FF;}}"
+    )
+
+def auth_combo_style():
+    return (
+        f"QComboBox{{border:1.5px solid {BORDER};border-radius:12px;"
+        f"padding:0 14px;font-size:12px;color:{TEXT_DARK};background:#FFFFFF;}}"
+        f"QComboBox:focus{{border:2px solid {PRIMARY};}}"
+        "QComboBox::drop-down{border:none;width:20px;}"
+    )
 
 
 # ── Dialogs ────────────────────────────────────────────────────────────────────
@@ -498,7 +543,7 @@ class PostCard(QFrame):
         row.addWidget(make_avatar(self.current_user.get('avatar_initials','?'), size=32, palette_idx=0))
         self.cmt_input = QLineEdit()
         self.cmt_input.setPlaceholderText('Write a comment...')
-        self.cmt_input.setStyleSheet(f"QLineEdit{{border:1.5px solid {BORDER};border-radius:18px;padding:8px 14px;font-size:12px;background:{BG_APP};}}QLineEdit:focus{{border-color:{PRIMARY};background:{WHITE};}}")
+        self.cmt_input.setStyleSheet(f"QLineEdit{{border:1.5px solid {BORDER};border-radius:18px;padding:8px 14px;font-size:12px;background:{BG_APP};color:{TEXT_DARK};}}QLineEdit:focus{{border-color:{PRIMARY};background:{WHITE};}}")
         self.cmt_input.returnPressed.connect(self._send_comment)
         send = QPushButton('Send')
         send.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -600,21 +645,18 @@ class ComposeBox(QFrame):
         bottom.addWidget(self.tag_combo)
         bottom.addStretch()
 
-        # THE POST BUTTON — large, visible, unmissable
         self.post_btn = QPushButton('📢  Post Now')
         self.post_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.post_btn.setFixedHeight(42)
         self.post_btn.setMinimumWidth(130)
         self.post_btn.setStyleSheet(f"""
             QPushButton {{
-                background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 {PRIMARY},stop:1 #2E8BF0);
+                background: {PRIMARY};
                 color: white; border: none; border-radius: 21px;
                 padding: 0 28px; font-size: 14px; font-weight: 800;
                 letter-spacing: 0.3px;
             }}
-            QPushButton:hover {{
-                background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 {PRIMARY_DARK},stop:1 {PRIMARY});
-            }}
+            QPushButton:hover {{ background: {PRIMARY_DARK}; }}
             QPushButton:pressed {{ background: {PRIMARY_DARK}; }}
         """)
         self.post_btn.clicked.connect(self._submit)
@@ -982,35 +1024,113 @@ class LoginPage(QWidget):
         self._build()
 
     def _build(self):
-        self.setStyleSheet(f"background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 {BG_SIDEBAR},stop:0.6 #1E2A5E,stop:1 #1A6ED8);")
-        outer = QVBoxLayout(self); outer.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        c = QFrame(); c.setFixedWidth(420)
-        c.setStyleSheet(f"QFrame{{background:{WHITE};border:none;border-radius:20px;}}")
-        cl = QVBoxLayout(c); cl.setContentsMargins(36,36,36,36); cl.setSpacing(16)
-        r = QHBoxLayout(); r.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        r.addWidget(QLabel('AUPP', styleSheet=f"font-size:28px;font-weight:900;color:{PRIMARY};border:none;background:transparent;letter-spacing:-1px;"))
-        r.addWidget(QLabel('Connect', styleSheet=f"font-size:28px;font-weight:900;color:{TEXT_DARK};border:none;background:transparent;letter-spacing:-1px;"))
-        cl.addLayout(r)
-        cl.addWidget(QLabel('Welcome back! Sign in to continue.', styleSheet=f"font-size:13px;color:{TEXT_MUTED};border:none;background:transparent;", alignment=Qt.AlignmentFlag.AlignCenter))
-        self.err = QLabel(); self.err.setStyleSheet(f"background:#FEF2F2;color:{DANGER};border:1px solid #FECACA;border-radius:10px;padding:10px 14px;font-size:12px;")
-        self.err.setVisible(False); self.err.setWordWrap(True); cl.addWidget(self.err)
-        self.email = QLineEdit(); self.email.setPlaceholderText('📧  Email address')
-        self.password = QLineEdit(); self.password.setPlaceholderText('🔒  Password')
+        self.setStyleSheet(
+            "background: qlineargradient(x1:0, y1:0, x2:1, y2:1,"
+            "stop:0 #0A1628, stop:0.5 #0F2D6B, stop:1 #1A6ED8);"
+        )
+        outer = QVBoxLayout(self)
+        outer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        c = QFrame()
+        c.setFixedWidth(440)
+        c.setStyleSheet("QFrame { background: #FFFFFF; border: none; border-radius: 24px; }")
+        cl = QVBoxLayout(c)
+        cl.setContentsMargins(44, 40, 44, 40)
+        cl.setSpacing(0)
+
+        logo_row = QHBoxLayout()
+        logo_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logo_row.setSpacing(0)
+        logo_row.addWidget(QLabel('AUPP', styleSheet=f"font-size:30px;font-weight:900;color:{PRIMARY};border:none;background:transparent;letter-spacing:-1px;"))
+        logo_row.addWidget(QLabel(' Connect', styleSheet=f"font-size:30px;font-weight:900;color:{TEXT_DARK};border:none;background:transparent;letter-spacing:-1px;"))
+        cl.addLayout(logo_row)
+        cl.addSpacing(4)
+
+        platform_lbl = QLabel('Student Community Platform')
+        platform_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        platform_lbl.setStyleSheet(f"font-size:11px;color:{TEXT_MUTED};border:none;background:transparent;letter-spacing:0.5px;")
+        cl.addWidget(platform_lbl)
+        cl.addSpacing(20)
+
+        self.err = QLabel()
+        self.err.setStyleSheet(
+            f"background:#FEF2F2; color:{DANGER};"
+            "border: 1px solid #FECACA; border-radius: 10px;"
+            "padding: 10px 14px; font-size: 12px;"
+        )
+        self.err.setVisible(False)
+        self.err.setWordWrap(True)
+        cl.addWidget(self.err)
+
+        email_lbl = QLabel('Email Address')
+        email_lbl.setStyleSheet(f"font-size:11px;font-weight:700;color:{TEXT_MID};letter-spacing:0.4px;border:none;background:transparent;")
+        cl.addWidget(email_lbl)
+        cl.addSpacing(5)
+        self.email = QLineEdit()
+        self.email.setPlaceholderText('you@aupp.edu.kh')
+        self.email.setFixedHeight(46)
+        self.email.setStyleSheet(
+            f"QLineEdit {{ border: 1.5px solid {BORDER}; border-radius: 12px;"
+            f"padding: 0 16px; font-size: 13px; background: #FFFFFF; color: {TEXT_DARK}; }}"
+            f"QLineEdit:focus {{ border: 2px solid {PRIMARY}; background: #F5F9FF; }}"
+        )
+        cl.addWidget(self.email)
+        cl.addSpacing(16)
+
+        pwd_lbl = QLabel('Password')
+        pwd_lbl.setStyleSheet(f"font-size:11px;font-weight:700;color:{TEXT_MID};letter-spacing:0.4px;border:none;background:transparent;")
+        cl.addWidget(pwd_lbl)
+        cl.addSpacing(5)
+        self.password = QLineEdit()
+        self.password.setPlaceholderText('Enter your password')
+        self.password.setFixedHeight(46)
         self.password.setEchoMode(QLineEdit.EchoMode.Password)
-        cl.addWidget(self.email); cl.addWidget(self.password)
-        btn = QPushButton('Sign In  →'); btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor)); btn.setFixedHeight(46)
-        btn.setStyleSheet(f"QPushButton{{background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 {PRIMARY},stop:1 #2E8BF0);color:white;border:none;border-radius:23px;font-size:15px;font-weight:700;}}QPushButton:hover{{background:{PRIMARY_DARK};}}")
-        btn.clicked.connect(self._login); self.password.returnPressed.connect(self._login); cl.addWidget(btn)
-        lnk = QLabel("Don't have an account? <a href='#' style='color:#1A6ED8;font-weight:600;'>Create one</a>")
-        lnk.setAlignment(Qt.AlignmentFlag.AlignCenter); lnk.setStyleSheet(f"font-size:12px;color:{TEXT_MUTED};border:none;background:transparent;")
-        lnk.linkActivated.connect(lambda: self.go_register.emit()); cl.addWidget(lnk); outer.addWidget(c)
+        self.password.setStyleSheet(
+            f"QLineEdit {{ border: 1.5px solid {BORDER}; border-radius: 12px;"
+            f"padding: 0 16px; font-size: 13px; background: #FFFFFF; color: {TEXT_DARK}; }}"
+            f"QLineEdit:focus {{ border: 2px solid {PRIMARY}; background: #F5F9FF; }}"
+        )
+        self.password.returnPressed.connect(self._login)
+        cl.addWidget(self.password)
+        cl.addSpacing(26)
+
+        btn = QPushButton('Sign In  →')
+        btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        btn.setFixedHeight(48)
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {PRIMARY};
+                color: white; border: none; border-radius: 24px;
+                font-size: 15px; font-weight: 800; letter-spacing: 0.3px;
+            }}
+            QPushButton:hover {{ background: {PRIMARY_DARK}; }}
+            QPushButton:pressed {{ background: {PRIMARY_DARK}; }}
+        """)
+        btn.clicked.connect(self._login)
+        cl.addWidget(btn)
+        cl.addSpacing(18)
+
+        lnk = QLabel("Don't have an account? <a href='#' style='color:#1A6ED8;font-weight:700;text-decoration:none;'>Create one</a>")
+        lnk.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lnk.setStyleSheet(f"font-size:12px;color:{TEXT_MUTED};border:none;background:transparent;")
+        lnk.linkActivated.connect(lambda: self.go_register.emit())
+        cl.addWidget(lnk)
+
+        outer.addWidget(c)
 
     def _login(self):
-        email = self.email.text().strip(); pwd = self.password.text()
-        if not email or not pwd: self.err.setText('Please enter your email and password.'); self.err.setVisible(True); return
+        email = self.email.text().strip()
+        pwd   = self.password.text()
+        if not email or not pwd:
+            self.err.setText('Please enter your email and password.')
+            self.err.setVisible(True)
+            return
         result = api('POST', '/login/', {'email': email, 'password': pwd})
-        if result.get('ok'): self.login_success.emit(result['user'])
-        else: self.err.setText(result.get('error','Login failed.')); self.err.setVisible(True)
+        if result.get('ok'):
+            self.login_success.emit(result['user'])
+        else:
+            self.err.setText(result.get('error', 'Login failed.'))
+            self.err.setVisible(True)
 
 
 class RegisterPage(QWidget):
@@ -1022,46 +1142,175 @@ class RegisterPage(QWidget):
         self._build()
 
     def _build(self):
-        self.setStyleSheet(f"background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 {BG_SIDEBAR},stop:0.6 #1E2A5E,stop:1 #1A6ED8);")
-        outer = QVBoxLayout(self); outer.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        c = QFrame(); c.setFixedWidth(460)
-        c.setStyleSheet(f"QFrame{{background:{WHITE};border:none;border-radius:20px;}}")
-        cl = QVBoxLayout(c); cl.setContentsMargins(36,32,36,32); cl.setSpacing(12)
-        cl.addWidget(QLabel('Create Account', styleSheet=f"font-size:22px;font-weight:800;color:{TEXT_DARK};border:none;background:transparent;", alignment=Qt.AlignmentFlag.AlignCenter))
-        self.err = QLabel(); self.err.setStyleSheet(f"background:#FEF2F2;color:{DANGER};border:1px solid #FECACA;border-radius:10px;padding:10px 14px;font-size:12px;")
-        self.err.setVisible(False); self.err.setWordWrap(True); cl.addWidget(self.err)
-        r1 = QHBoxLayout()
-        self.first = QLineEdit(); self.first.setPlaceholderText('First name')
-        self.last  = QLineEdit(); self.last.setPlaceholderText('Last name')
-        r1.addWidget(self.first); r1.addWidget(self.last); cl.addLayout(r1)
-        self.email = QLineEdit(); self.email.setPlaceholderText('Email address')
-        self.uname = QLineEdit(); self.uname.setPlaceholderText('Username')
-        self.pwd   = QLineEdit(); self.pwd.setPlaceholderText('Password (min 6 chars)'); self.pwd.setEchoMode(QLineEdit.EchoMode.Password)
-        self.pwd2  = QLineEdit(); self.pwd2.setPlaceholderText('Confirm password'); self.pwd2.setEchoMode(QLineEdit.EchoMode.Password)
-        for w in [self.email, self.uname, self.pwd, self.pwd2]: cl.addWidget(w)
-        r2 = QHBoxLayout()
-        self.dept = QComboBox()
-        for code, name in _meta['departments'].items(): self.dept.addItem(name, code)
-        self.year = QComboBox()
-        for y in range(1,5): self.year.addItem(f'Year {y}', y)
-        r2.addWidget(self.dept); r2.addWidget(self.year); cl.addLayout(r2)
-        btn = QPushButton('Create Account  →'); btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor)); btn.setFixedHeight(46)
-        btn.setStyleSheet(f"QPushButton{{background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 {PRIMARY},stop:1 #2E8BF0);color:white;border:none;border-radius:23px;font-size:15px;font-weight:700;}}QPushButton:hover{{background:{PRIMARY_DARK};}}")
-        btn.clicked.connect(self._register); cl.addWidget(btn)
-        lnk = QLabel("Already have an account? <a href='#' style='color:#1A6ED8;font-weight:600;'>Sign in</a>")
-        lnk.setAlignment(Qt.AlignmentFlag.AlignCenter); lnk.setStyleSheet(f"font-size:12px;color:{TEXT_MUTED};border:none;background:transparent;")
-        lnk.linkActivated.connect(lambda: self.go_login.emit()); cl.addWidget(lnk); outer.addWidget(c)
+        self.setStyleSheet(
+            "background: qlineargradient(x1:0, y1:0, x2:1, y2:1,"
+            "stop:0 #0A1628, stop:0.5 #0F2D6B, stop:1 #1A6ED8);"
+        )
+        outer = QVBoxLayout(self)
+        outer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        c = QFrame()
+        c.setFixedWidth(480)
+        c.setStyleSheet("QFrame { background: #FFFFFF; border: none; border-radius: 24px; }")
+        cl = QVBoxLayout(c)
+        cl.setContentsMargins(44, 36, 44, 36)
+        cl.setSpacing(0)
+
+        # Header
+        title = QLabel('Create Your Account')
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet(f"font-size:18px;font-weight:800;color:{TEXT_DARK};border:none;background:transparent;")
+        cl.addWidget(title)
+        cl.addSpacing(3)
+
+        sub = QLabel('Join the AUPP student community')
+        sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sub.setStyleSheet(f"font-size:11px;color:{TEXT_MUTED};border:none;background:transparent;")
+        cl.addWidget(sub)
+        cl.addSpacing(20)
+
+        # Error
+        self.err = QLabel()
+        self.err.setStyleSheet(
+            f"background:#FEF2F2; color:{DANGER};"
+            "border: 1px solid #FECACA; border-radius: 10px;"
+            "padding: 10px 14px; font-size: 12px;"
+        )
+        self.err.setVisible(False)
+        self.err.setWordWrap(True)
+        cl.addWidget(self.err)
+
+        # Field styles
+        fs = (
+            f"QLineEdit {{ border: 1.5px solid {BORDER}; border-radius: 12px;"
+            f"padding: 0 14px; font-size: 13px; background: #FFFFFF; color: {TEXT_DARK}; }}"
+            f"QLineEdit:focus {{ border: 2px solid {PRIMARY}; background: #F5F9FF; }}"
+        )
+        cs = (
+            f"QComboBox {{ border: 1.5px solid {BORDER}; border-radius: 12px;"
+            f"padding: 0 14px; font-size: 12px; color: {TEXT_DARK}; background: #FFFFFF; }}"
+            f"QComboBox:focus {{ border: 2px solid {PRIMARY}; }}"
+            "QComboBox::drop-down { border: none; width: 20px; }"
+        )
+
+        # Name row
+        r1 = QHBoxLayout(); r1.setSpacing(10)
+        self.first = QLineEdit(); self.first.setPlaceholderText('First name'); self.first.setFixedHeight(42); self.first.setStyleSheet(fs)
+        self.last  = QLineEdit(); self.last.setPlaceholderText('Last name');   self.last.setFixedHeight(42);  self.last.setStyleSheet(fs)
+        r1.addWidget(self.first); r1.addWidget(self.last)
+        cl.addLayout(r1)
+        cl.addSpacing(10)
+
+        self.email = QLineEdit(); self.email.setPlaceholderText('Email address'); self.email.setFixedHeight(42); self.email.setStyleSheet(fs)
+        cl.addWidget(self.email)
+        cl.addSpacing(10)
+
+        self.uname = QLineEdit(); self.uname.setPlaceholderText('Username'); self.uname.setFixedHeight(42); self.uname.setStyleSheet(fs)
+        cl.addWidget(self.uname)
+        cl.addSpacing(10)
+
+        # Password row
+        r2 = QHBoxLayout(); r2.setSpacing(10)
+        self.pwd  = QLineEdit(); self.pwd.setPlaceholderText('Password (min 8 characters)');  self.pwd.setEchoMode(QLineEdit.EchoMode.Password);  self.pwd.setFixedHeight(42);  self.pwd.setStyleSheet(fs)
+        self.pwd2 = QLineEdit(); self.pwd2.setPlaceholderText('Confirm password'); self.pwd2.setEchoMode(QLineEdit.EchoMode.Password); self.pwd2.setFixedHeight(42); self.pwd2.setStyleSheet(fs)
+        r2.addWidget(self.pwd); r2.addWidget(self.pwd2)
+        cl.addLayout(r2)
+        cl.addSpacing(10)
+
+        # Grouped major dropdown
+        GROUPED_DEPARTMENTS = {
+            'Faculty of Digital Technologies': {
+                'AI':  'Artificial Intelligence',
+                'CS':  'Computer Science',
+                'CB':  'Cybersecurity',
+                'DA':  'Data Analytics',
+                'DI':  'Digital Infrastructure',
+                'ICT': 'Information and Communication Technology',
+                'IAD': 'Interactive App Design and Development',
+                'SW':  'Software Development',
+            },
+            'Faculty of Business and Management': {
+                'BA':  'Business Administration',
+                'COM': 'Communications',
+                'e-s': 'e-Society (Digital Marketing)',
+            },
+            'Faculty of Law': {
+                'LAW': 'Law',
+            },
+            'Faculty of Social Sciences': {
+                'IR': 'International Relations and Diplomacy/Political Science',
+            },
+        }
+
+        r3 = QHBoxLayout(); r3.setSpacing(10)
+        self.dept = QComboBox(); self.dept.setFixedHeight(42); self.dept.setStyleSheet(cs)
+        self.dept.addItem('Select Major', '')
+        for group_label, majors in GROUPED_DEPARTMENTS.items():
+            self.dept.addItem(group_label, '__header__')
+            idx = self.dept.count() - 1
+            self.dept.model().item(idx).setEnabled(False)
+            self.dept.model().item(idx).setForeground(QColor('#1A6ED8'))
+            for code, name in majors.items():
+                self.dept.addItem(f'   {name}', code)
+
+        self.year = QComboBox(); self.year.setFixedHeight(42); self.year.setStyleSheet(cs)
+        self.year.addItem('Select Year', '')
+        for y in range(1, 5):
+            self.year.addItem(f'Year {y}', y)
+
+        r3.addWidget(self.dept, 2); r3.addWidget(self.year, 1)
+        cl.addLayout(r3)
+        cl.addSpacing(22)
+
+        btn = QPushButton('Create Account  →')
+        btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        btn.setFixedHeight(48)
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {PRIMARY};
+                color: white; border: none; border-radius: 24px;
+                font-size: 15px; font-weight: 800; letter-spacing: 0.3px;
+            }}
+            QPushButton:hover {{ background: {PRIMARY_DARK}; }}
+            QPushButton:pressed {{ background: {PRIMARY_DARK}; }}
+        """)
+        btn.clicked.connect(self._register)
+        cl.addWidget(btn)
+        cl.addSpacing(16)
+
+        lnk = QLabel("Already have an account? <a href='#' style='color:#1A6ED8;font-weight:700;text-decoration:none;'>Sign in</a>")
+        lnk.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lnk.setStyleSheet(f"font-size:12px;color:{TEXT_MUTED};border:none;background:transparent;")
+        lnk.linkActivated.connect(lambda: self.go_login.emit())
+        cl.addWidget(lnk)
+
+        outer.addWidget(c)
 
     def _register(self):
-        first=self.first.text().strip(); last=self.last.text().strip()
-        email=self.email.text().strip(); uname=self.uname.text().strip()
-        pwd=self.pwd.text(); pwd2=self.pwd2.text()
-        if not all([first,last,email,uname,pwd]): self.err.setText('All fields are required.'); self.err.setVisible(True); return
-        if pwd != pwd2: self.err.setText('Passwords do not match.'); self.err.setVisible(True); return
-        if len(pwd) < 6: self.err.setText('Password must be at least 6 characters.'); self.err.setVisible(True); return
-        result = api('POST', '/register/', {'email':email,'username':uname,'first_name':first,'last_name':last,'password':pwd,'department':self.dept.currentData(),'year_level':self.year.currentData()})
-        if result.get('ok'): self.register_success.emit()
-        else: self.err.setText(result.get('error','Registration failed.')); self.err.setVisible(True)
+        first = self.first.text().strip(); last  = self.last.text().strip()
+        email = self.email.text().strip(); uname = self.uname.text().strip()
+        pwd   = self.pwd.text();           pwd2  = self.pwd2.text()
+        if not all([first, last, email, uname, pwd]):
+            self.err.setText('All fields are required.'); self.err.setVisible(True); return
+        if not self.dept.currentData() or self.dept.currentData() == '__header__':
+            self.err.setText('Please select your major.'); self.err.setVisible(True); return
+        if not self.year.currentData():
+            self.err.setText('Please select your year.'); self.err.setVisible(True); return
+        if pwd != pwd2:
+            self.err.setText('Passwords do not match.'); self.err.setVisible(True); return
+        if len(pwd) < 8:
+            self.err.setText('Password must be at least 8 characters.'); self.err.setVisible(True); return
+        result = api('POST', '/register/', {
+            'email': email, 'username': uname, 'first_name': first,
+            'last_name': last, 'password': pwd,
+            'department': self.dept.currentData(),
+            'year_level': self.year.currentData(),
+        })
+        if result.get('ok'):
+            self.register_success.emit()
+        else:
+            self.err.setText(result.get('error', 'Registration failed.'))
+            self.err.setVisible(True)
 
 
 # ── Main Window ────────────────────────────────────────────────────────────────
